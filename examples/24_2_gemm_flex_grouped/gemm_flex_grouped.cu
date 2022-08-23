@@ -1,4 +1,5 @@
 
+
     /***************************************************************************************************
     * Copyright (c) 2017 - 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     * SPDX-License-Identifier: BSD-3-Clause
@@ -78,8 +79,12 @@
     #include "cutlass/cutlass.h"
     #include "cutlass/gemm/gemm.h"
     #include "cutlass/gemm/kernel/gemm_grouped.h"
+
+    #include "cutlass/gemm/kernel/gemm_flex_grouped_2.h"
+    #include "cutlass/gemm/kernel/default_gemm_flex_grouped_2.h"
     #include "cutlass/gemm/kernel/default_gemm_grouped.h"
     #include "cutlass/gemm/device/gemm_grouped.h"
+    #include "cutlass/gemm/device/gemm_flex_grouped_2.h"
     #include "cutlass/gemm/device/gemm_universal.h"
 
     #include "cutlass/util/command_line.h"
@@ -184,7 +189,7 @@
         }
 
         cmd.get_cmd_line_argument("alignment", alignment, 8);
-        cmd.get_cmd_line_argument("groups", problem_count, 15);
+cmd.get_cmd_line_argument("groups", problem_count, 2);        
         cmd.get_cmd_line_argument("alpha", alpha, 1.0f);
         cmd.get_cmd_line_argument("beta", beta, 0.0f);    
         cmd.get_cmd_line_argument("iterations", iterations, 20);
@@ -414,7 +419,7 @@
     using ElementC = typename Gemm::ElementC;
     using ElementAccumulator = typename Gemm::ElementAccumulator;
 
-    using EpilogueOutputOp = typename Gemm::GemmKernel::Epilogue::OutputOp;
+    using EpilogueOutputOp = typename Gemm::GemmKernel::Epilogue1::OutputOp;
     using ElementCompute = typename EpilogueOutputOp::ElementCompute;
 
     using LayoutA = typename Gemm::LayoutA;
@@ -553,8 +558,8 @@
         for (auto const & problem : options.problem_sizes) {
 
         int tiles = 
-            ((problem.m() + Gemm::ThreadblockShape::kM - 1) / Gemm::ThreadblockShape::kM) * 
-            ((problem.n() + Gemm::ThreadblockShape::kN - 1) / Gemm::ThreadblockShape::kN);
+            ((problem.m() + Gemm::ThreadblockShape1::kM - 1) / Gemm::ThreadblockShape1::kM) * 
+            ((problem.n() + Gemm::ThreadblockShape1::kN - 1) / Gemm::ThreadblockShape1::kN);
 
         total_tiles += tiles;
 
@@ -747,6 +752,8 @@
         if (!passed) {
             std::cerr << "\n***\nError - problem " << i << " failed the QA check\n***\n" << std::endl;
             return passed;
+        }else{
+            std::cout << "Passed!" << std::endl;
         }
         }
 
@@ -938,8 +945,8 @@
         for (auto const & problem : options.problem_sizes) {
 
         int tiles = 
-            ((problem.m() + Gemm::ThreadblockShape::kM - 1) / Gemm::ThreadblockShape::kM) * 
-            ((problem.n() + Gemm::ThreadblockShape::kN - 1) / Gemm::ThreadblockShape::kN);
+            ((problem.m() + Gemm::ThreadblockShape1::kM - 1) / Gemm::ThreadblockShape1::kM) * 
+            ((problem.n() + Gemm::ThreadblockShape1::kN - 1) / Gemm::ThreadblockShape1::kN);
 
         total_tiles += tiles;
         ++idx;
@@ -1015,16 +1022,16 @@
     // Define the Grouped GEMM type
     //
 
-    using ElementInput = int8_t;
-    using ElementOutput = int8_t;
-    using ElementAccumulator = int32_t;
+    using ElementInput = float;
+    using ElementOutput = float;
+    using ElementAccumulator = float;
 
     using LayoutA = cutlass::layout::ColumnMajor;
     using LayoutB = cutlass::layout::ColumnMajor;
     using LayoutC = cutlass::layout::ColumnMajor;
 
     
-    using GemmKernel1 = typename cutlass::gemm::kernel::DefaultGemmGrouped<
+    using GemmKernel1 = typename cutlass::gemm::kernel::DefaultGemmFlexGrouped<
         ElementInput, 
         LayoutA,
         cutlass::ComplexTransform::kNone,
@@ -1037,16 +1044,22 @@
         ElementAccumulator, 
         cutlass::arch::OpClassSimt, 
         cutlass::arch::Sm80,
-        cutlass::gemm::GemmShape<32, 64, 16>,
-        cutlass::gemm::GemmShape<32, 64, 16>,
-        cutlass::gemm::GemmShape<1, 1, 4>,
+
+        cutlass::gemm::GemmShape<32, 32, 8>,
+        cutlass::gemm::GemmShape<32, 32, 8>,
+        cutlass::gemm::GemmShape<1, 1, 1>,
+
+        cutlass::gemm::GemmShape<32, 32, 4>,
+        cutlass::gemm::GemmShape<32, 32, 4>,
+        cutlass::gemm::GemmShape<1, 1, 1>,
+
         cutlass::epilogue::thread::LinearCombination<
             ElementOutput, 1,
             ElementAccumulator, ElementAccumulator>,
         cutlass::gemm::threadblock::GemmBatchedIdentityThreadblockSwizzle, 
         2>::GemmKernel;
 
-    using GemmGrouped1 = cutlass::gemm::device::GemmGrouped<GemmKernel1>;
+    using GemmGrouped1 = cutlass::gemm::device::GemmFlexGrouped<GemmKernel1>;
     
 
     // using GemmKernel8 = typename cutlass::gemm::kernel::DefaultGemmGrouped<
@@ -1124,4 +1137,5 @@
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
+    
     
