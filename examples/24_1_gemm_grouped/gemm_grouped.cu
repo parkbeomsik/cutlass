@@ -1015,9 +1015,9 @@
     // Define the Grouped GEMM type
     //
 
-    using ElementInput = float;
-    using ElementOutput = float;
-    using ElementAccumulator = float;
+    using ElementInput = int8_t;
+    using ElementOutput = int8_t;
+    using ElementAccumulator = int32_t;
 
     using LayoutA = cutlass::layout::ColumnMajor;
     using LayoutB = cutlass::layout::ColumnMajor;
@@ -1037,14 +1037,14 @@
         ElementAccumulator, 
         cutlass::arch::OpClassSimt, 
         cutlass::arch::Sm80,
-        cutlass::gemm::GemmShape<128, 128, 8>,
-        cutlass::gemm::GemmShape<128, 128, 8>,
-        cutlass::gemm::GemmShape<1, 1, 1>,
+        cutlass::gemm::GemmShape<32, 64, 16>,
+        cutlass::gemm::GemmShape<32, 64, 16>,
+        cutlass::gemm::GemmShape<1, 1, 4>,
         cutlass::epilogue::thread::LinearCombination<
             ElementOutput, 1,
             ElementAccumulator, ElementAccumulator>,
         cutlass::gemm::threadblock::GemmBatchedIdentityThreadblockSwizzle, 
-        4>::GemmKernel;
+        2>::GemmKernel;
 
     using GemmGrouped1 = cutlass::gemm::device::GemmGrouped<GemmKernel1>;
     
