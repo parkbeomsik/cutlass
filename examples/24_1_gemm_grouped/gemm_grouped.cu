@@ -1,4 +1,5 @@
 
+
     /***************************************************************************************************
     * Copyright (c) 2017 - 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     * SPDX-License-Identifier: BSD-3-Clause
@@ -745,7 +746,7 @@
         passed = cutlass::reference::host::TensorEquals(view_D, view_Ref);
 
         if (!passed) {
-            std::cerr << "\n***\nError - problem " << i << " failed the QA check\n***\n" << std::endl;
+            std::cerr << "\n***\\\\\\nError - problem " << i << " failed the QA check\n***\n" << std::endl;
             return passed;
         }
         }
@@ -980,18 +981,18 @@
         return -1;
     }
 
-    if (__CUDACC_VER_MAJOR__ < 11 || props.major < 8) {
-    
-        //
-        // This example requires an NVIDIA Ampere-architecture GPU.
-        //
-
-        std::cout 
-        << "CUTLASS's Grouped GEMM example requires a GPU of NVIDIA's Ampere Architecture or "
-        << "later (compute capability 80 or greater).\n";
-
-        return 0;
-    }
+    // if (__CUDACC_VER_MAJOR__ < 11 || props.major < 8) {
+    // 
+    //     //
+    //     // This example requires an NVIDIA Ampere-architecture GPU.
+    //     //
+// 
+    //     std::cout 
+    //     << "CUTLASS's Grouped GEMM example requires a GPU of NVIDIA's Ampere Architecture or "
+    //     << "later (compute capability 80 or greater).\n";
+// 
+    //     return 0;
+    // }
 
     //
     // Parse options
@@ -1015,9 +1016,9 @@
     // Define the Grouped GEMM type
     //
 
-    using ElementInput = float;
-    using ElementOutput = float;
-    using ElementAccumulator = float;
+    using ElementInput = int8_t;
+    using ElementOutput = int8_t;
+    using ElementAccumulator = int32_t;
 
     using LayoutA = cutlass::layout::ColumnMajor;
     using LayoutB = cutlass::layout::ColumnMajor;
@@ -1028,18 +1029,18 @@
         ElementInput, 
         LayoutA,
         cutlass::ComplexTransform::kNone,
-        1,
+        4,
         ElementInput,
         LayoutB,
         cutlass::ComplexTransform::kNone,
-        1,
+        4,
         ElementOutput, LayoutC,
         ElementAccumulator, 
         cutlass::arch::OpClassSimt, 
         cutlass::arch::Sm80,
-        cutlass::gemm::GemmShape<128, 128, 8>,
-        cutlass::gemm::GemmShape<128, 128, 8>,
-        cutlass::gemm::GemmShape<1, 1, 1>,
+        cutlass::gemm::GemmShape<128, 128, 32>,
+        cutlass::gemm::GemmShape<128, 128, 32>,
+        cutlass::gemm::GemmShape<1, 1, 4>,
         cutlass::epilogue::thread::LinearCombination<
             ElementOutput, 1,
             ElementAccumulator, ElementAccumulator>,
@@ -1048,33 +1049,6 @@
 
     using GemmGrouped1 = cutlass::gemm::device::GemmGrouped<GemmKernel1>;
     
-
-    // using GemmKernel8 = typename cutlass::gemm::kernel::DefaultGemmGrouped<
-    //   ElementInput, 
-    //   LayoutA,
-    //   cutlass::ComplexTransform::kNone,
-    //   1,
-    //   ElementInput,
-    //   LayoutB,
-    //   cutlass::ComplexTransform::kNone,
-    //   1,
-    //   ElementOutput, LayoutC,
-    //   ElementAccumulator, 
-    //   cutlass::arch::OpClassTensorOp,
-    //   cutlass::arch::Sm80,
-    //   cutlass::gemm::GemmShape<128, 128, 32>,
-    //   cutlass::gemm::GemmShape<64, 64, 32>,
-    //   cutlass::gemm::GemmShape<16, 8, 8>,
-    //   cutlass::epilogue::thread::LinearCombination<
-    //     ElementOutput,
-    //     128 / cutlass::sizeof_bits<ElementOutput>::value,
-    //     ElementAccumulator,
-    //     ElementAccumulator
-    //   >,
-    //   cutlass::gemm::threadblock::GemmBatchedIdentityThreadblockSwizzle, 
-    //   4>::GemmKernel;
-
-    // using GemmGrouped8 = cutlass::gemm::device::GemmGrouped<GemmKernel8>;
 
     //
     // Profile it
@@ -1101,7 +1075,7 @@
     //   return -1;
     // }
 
-    std::vector<Result> result_list = {{result1}}; //, result2, result3, result4, result5, result6, result7, result8};  
+    std::vector<Result> result_list = {result1}; //, result2, result3, result4, result5, result6, result7, result8};  
     double min_runtime = 1000;
     int min_algo = 0;
     for (int i=0; i<result_list.size(); i++){
@@ -1124,4 +1098,5 @@
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
+    
     

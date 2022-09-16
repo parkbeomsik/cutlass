@@ -987,18 +987,18 @@ cmd.get_cmd_line_argument("groups", problem_count, 2);
         return -1;
     }
 
-    if (__CUDACC_VER_MAJOR__ < 11 || props.major < 8) {
+    // if (__CUDACC_VER_MAJOR__ < 11 || props.major < 8) {
     
-        //
-        // This example requires an NVIDIA Ampere-architecture GPU.
-        //
+    //     //
+    //     // This example requires an NVIDIA Ampere-architecture GPU.
+    //     //
 
-        std::cout 
-        << "CUTLASS's Grouped GEMM example requires a GPU of NVIDIA's Ampere Architecture or "
-        << "later (compute capability 80 or greater).\n";
+    //     std::cout 
+    //     << "CUTLASS's Grouped GEMM example requires a GPU of NVIDIA's Ampere Architecture or "
+    //     << "later (compute capability 80 or greater).\n";
 
-        return 0;
-    }
+    //     return 0;
+    // }
 
     //
     // Parse options
@@ -1043,7 +1043,7 @@ cmd.get_cmd_line_argument("groups", problem_count, 2);
         ElementOutput, LayoutC,
         ElementAccumulator, 
         cutlass::arch::OpClassSimt, 
-        cutlass::arch::Sm80,
+        cutlass::arch::Sm70,
 
         cutlass::gemm::GemmShape<32, 32, 8>,
         cutlass::gemm::GemmShape<32, 32, 8>,

@@ -980,18 +980,18 @@
         return -1;
     }
 
-    if (__CUDACC_VER_MAJOR__ < 11 || props.major < 8) {
-    
-        //
-        // This example requires an NVIDIA Ampere-architecture GPU.
-        //
-
-        std::cout 
-        << "CUTLASS's Grouped GEMM example requires a GPU of NVIDIA's Ampere Architecture or "
-        << "later (compute capability 80 or greater).\n";
-
-        return 0;
-    }
+    // if (__CUDACC_VER_MAJOR__ < 11 || props.major < 8) {
+    // 
+    //     //
+    //     // This example requires an NVIDIA Ampere-architecture GPU.
+    //     //
+    // 
+    //     std::cout 
+    //     << "CUTLASS's Grouped GEMM example requires a GPU of NVIDIA's Ampere Architecture or "
+    //     << "later (compute capability 80 or greater).\n";
+    // 
+    //     return 0;
+    // }
 
     //
     // Parse options
@@ -1015,9 +1015,9 @@
     // Define the Grouped GEMM type
     //
 
-    using ElementInput = int8_t;
-    using ElementOutput = int8_t;
-    using ElementAccumulator = int32_t;
+    using ElementInput = float;
+    using ElementOutput = float;
+    using ElementAccumulator = float;
 
     using LayoutA = cutlass::layout::ColumnMajor;
     using LayoutB = cutlass::layout::ColumnMajor;
@@ -1028,18 +1028,18 @@
         ElementInput, 
         LayoutA,
         cutlass::ComplexTransform::kNone,
-        4,
+        1,
         ElementInput,
         LayoutB,
         cutlass::ComplexTransform::kNone,
-        4,
+        1,
         ElementOutput, LayoutC,
         ElementAccumulator, 
         cutlass::arch::OpClassSimt, 
         cutlass::arch::Sm80,
-        cutlass::gemm::GemmShape<128, 128, 16>,
-        cutlass::gemm::GemmShape<64, 64, 16>,
-        cutlass::gemm::GemmShape<1, 1, 4>,
+        cutlass::gemm::GemmShape<32, 64, 8>,
+        cutlass::gemm::GemmShape<32, 16, 8>,
+        cutlass::gemm::GemmShape<1, 1, 1>,
         cutlass::epilogue::thread::LinearCombination<
             ElementOutput, 1,
             ElementAccumulator, ElementAccumulator>,
