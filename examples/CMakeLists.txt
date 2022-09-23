@@ -106,6 +106,7 @@ foreach(EXAMPLE
   24_gemm_grouped
   24_1_gemm_grouped
   24_2_gemm_flex_grouped
+  24_3_wgrad_grouped
   25_ampere_fprop_mainloop_fusion
   26_ampere_wgrad_mainloop_fusion
   27_ampere_3xtf32_fast_accurate_tensorop_gemm
