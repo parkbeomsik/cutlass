@@ -238,6 +238,14 @@ public:
     TensorRefC * ref_C;
     TensorRefC * ref_D;
 
+    ElementA ** ptr_A = nullptr;
+    ElementB ** ptr_B = nullptr;
+    ElementC ** ptr_C = nullptr;
+    ElementC ** ptr_D = nullptr;
+
+    LayoutA layout_A;
+    LayoutB layout_B;
+
     //
     // Methods
     //
@@ -247,7 +255,11 @@ public:
       ref_A(nullptr),
       ref_B(nullptr),
       ref_C(nullptr),
-      ref_D(nullptr)
+      ref_D(nullptr),
+      ptr_A(nullptr),
+      ptr_B(nullptr),
+      ptr_C(nullptr),
+      ptr_D(nullptr)
     { }
 
     CUTLASS_HOST_DEVICE
@@ -280,6 +292,22 @@ public:
       ref_C = args.ref_C;
       ref_D = args.ref_D;
     }
+
+    CUTLASS_HOST_DEVICE
+    void update_ptrs(
+      void ** _ptr_A,
+      void ** _ptr_B,
+      void ** _ptr_C,
+      void ** _ptr_D,
+      void *workspace = nullptr,
+      int tile_count = 0) {
+
+      ptr_A = (ElementA **)_ptr_A;
+      ptr_B = (ElementB **)_ptr_B;
+      ptr_C = (ElementC **)_ptr_C;
+      ptr_D = (ElementC **)_ptr_D;
+    }
+
   };
 
   /// Shared memory storage structure
@@ -398,14 +426,14 @@ public:
       typename Mma::IteratorA iterator_A(
         params_iterator_A,
         problem_size,
-        params.ref_A[problem_idx].data(),
+        params.ptr_A ? (ElementA *)params.ptr_A[problem_idx] : params.ref_A[problem_idx].data(),
         thread_idx,
         tb_offset_A);
 
       typename Mma::IteratorB iterator_B(
         params_iterator_B,
         problem_size,
-        params.ref_B[problem_idx].data(),
+        params.ptr_B ? (ElementB *)params.ptr_B[problem_idx] : params.ref_B[problem_idx].data(),
         thread_idx,
         tb_offset_B);
 
@@ -447,8 +475,8 @@ public:
 
       EpilogueOutputOp output_op(params.output_op);
 
-      ElementC *ptr_C = params.ref_C[problem_idx].data();
-      ElementC *ptr_D = params.ref_D[problem_idx].data();
+      ElementC *ptr_C = params.ptr_C ? params.ptr_C[problem_idx] : params.ref_C[problem_idx].data();
+      ElementC *ptr_D = params.ptr_D ? params.ptr_D[problem_idx] : params.ref_D[problem_idx].data();
 
       // typename Epilogue::OutputTileIterator::Params params_C(layout_C);
       // typename Epilogue::OutputTileIterator::Params params_D(layout_D);

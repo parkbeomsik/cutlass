@@ -410,6 +410,19 @@ public:
     return Status::kSuccess;
   }
 
+  /// Lightweight update given a subset of arguments
+  Status update_ptrs(void ** ptr_A,
+                     void ** ptr_B,
+                     void ** ptr_C,
+                     void ** ptr_D,
+                     int problem_count,
+                     void *workspace = nullptr) {
+
+    params_.update_ptrs(ptr_A, ptr_B, ptr_C, ptr_D, workspace);
+
+    return Status::kSuccess;
+  }
+
   /// Runs the kernel using initialized state.
   Status run(cudaStream_t stream = nullptr) {
 
