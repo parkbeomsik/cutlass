@@ -246,6 +246,9 @@ public:
     LayoutA layout_A;
     LayoutB layout_B;
 
+    int *semaphore;
+    SplitKMode split_k_mode;
+
     //
     // Methods
     //
@@ -264,15 +267,17 @@ public:
 
     CUTLASS_HOST_DEVICE
     Params(Arguments const &args,
-          void *workspace = nullptr,
-          int tile_count = 0):
-      problem_visitor(args.problem_sizes, args.problem_count, workspace, tile_count),
+           void *semaphore = nullptr,
+           int32_t tile_count = 0):
+      problem_visitor(args.problem_sizes, args.problem_count, semaphore, tile_count),
       threadblock_count(args.threadblock_count),
       output_op(args.output_op),
       ref_A(args.ref_A),
       ref_B(args.ref_B),
       ref_C(args.ref_C),
-      ref_D(args.ref_D)
+      ref_D(args.ref_D),
+      semaphore((int *)semaphore),
+      split_k_mode(args.split_k_mode)
     { 
 
     }
@@ -280,17 +285,20 @@ public:
     CUTLASS_HOST_DEVICE
     void update(
       Arguments const &args,
-      void *workspace = nullptr,
+      void *semaphore = nullptr,
       int tile_count = 0) {
 
       problem_visitor = typename ProblemVisitor::Params(args.problem_sizes, args.problem_count,
-                                                        workspace, tile_count);
+                                                        semaphore, tile_count);
       threadblock_count = args.threadblock_count;
       output_op = args.output_op;
       ref_A = args.ref_A;
       ref_B = args.ref_B;
       ref_C = args.ref_C;
       ref_D = args.ref_D;
+
+      semaphore = semaphore;
+      split_k_mode = args.split_k_mode;
     }
 
     CUTLASS_HOST_DEVICE
@@ -404,18 +412,18 @@ public:
       cutlass::gemm::GemmCoord grid_shape = problem_visitor.grid_shape(cutlass::conv::Operator::kWgrad, problem_size);
 
       cutlass::gemm::GemmCoord threadblock_offset(
-        int(threadblock_idx / grid_shape.n()) * Mma::Shape::kM,
-        int(threadblock_idx % grid_shape.n()) * Mma::Shape::kN,
-        0);
+        int(threadblock_idx / (grid_shape.n()*grid_shape.k())) * Mma::Shape::kM,
+        int((threadblock_idx / grid_shape.k()) % grid_shape.n()) * Mma::Shape::kN,
+        int(threadblock_idx % (grid_shape.k())) * Mma::Shape::kK);
       
       // Compute initial location in logical coordinates
       cutlass::MatrixCoord tb_offset_A{
         threadblock_offset.m(),
-        0,
+        threadblock_offset.k(),
       };
 
       cutlass::MatrixCoord tb_offset_B{
-        0,
+        threadblock_offset.k(),
         threadblock_offset.n()
       };
 
@@ -475,6 +483,18 @@ public:
 
       EpilogueOutputOp output_op(params.output_op);
 
+      Semaphore semaphore(params.semaphore + problem_visitor.prev_semaphore_count(problem_idx) + threadblock_idx / grid_shape.k(), thread_idx);
+
+      // If performing a reduction via split-K, fetch the initial synchronization
+      if (params.split_k_mode == SplitKMode::kSerial && grid_shape.k() > 1) {
+          
+        // Fetch the synchronization lock initially but do not block.
+        semaphore.fetch();
+
+        // Indicate which position in a serial reduction the output operator is currently updating
+        output_op.set_k_partition(int(threadblock_idx % (grid_shape.k())), grid_shape.k());
+      }
+
       ElementC *ptr_C = params.ptr_C ? params.ptr_C[problem_idx] : params.ref_C[problem_idx].data();
       ElementC *ptr_D = params.ptr_D ? params.ptr_D[problem_idx] : params.ref_D[problem_idx].data();
 
@@ -482,8 +502,8 @@ public:
       // typename Epilogue::OutputTileIterator::Params params_D(layout_D);
 
       MatrixCoord threadblock_offset_output(
-        threadblock_offset.m(),
-        threadblock_offset.n()
+        int(threadblock_idx / (grid_shape.n()*grid_shape.k())) * Mma::Shape::kM,
+        int((threadblock_idx / grid_shape.k()) % grid_shape.n()) * Mma::Shape::kN
       );
 
       // Tile iterator loading from source tensor.
@@ -510,12 +530,49 @@ public:
         warp_idx, 
         lane_idx);
 
+      // Wait on the semaphore - this latency may have been covered by iterator construction
+      if (params.split_k_mode == SplitKMode::kSerial && grid_shape.k() > 1) {
+          
+        // For subsequent threadblocks, the source matrix is held in the 'D' tensor.
+        if (int(threadblock_idx % (grid_shape.k()))) {
+          iterator_C = iterator_D;
+        }
+
+        semaphore.wait(int(threadblock_idx % (grid_shape.k())));
+
+      }
+      // Each split-k-slice writes to a unique tensor location
+      else if (params.split_k_mode == SplitKMode::kParallel) {
+        iterator_D.add_pointer_offset(int(threadblock_idx % (grid_shape.k())) * 
+          cutlass::conv::implicit_gemm_tensor_c_size(cutlass::conv::Operator::kWgrad, problem_visitor.problem_size()));
+      }
+
       // Execute the epilogue operator to update the destination tensor.
       epilogue(
         output_op, 
         iterator_D, 
         accumulators, 
         iterator_C); 
+
+      //
+      // Release the semaphore
+      //
+
+      if (params.split_k_mode == SplitKMode::kSerial && grid_shape.k() > 1) { 
+
+        int lock = 0;
+        if (grid_shape.k() == int(threadblock_idx % (grid_shape.k())) + 1) {
+
+          // The final threadblock resets the semaphore for subsequent grids.
+          lock = 0;
+        }
+        else {
+          // Otherwise, the semaphore is incremented
+          lock = int(threadblock_idx % (grid_shape.k())) + 1;
+        }
+        
+        semaphore.release(lock);
+      }
 
       // Next tile
       problem_visitor.advance(gridDim.x);

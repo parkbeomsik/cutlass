@@ -64,7 +64,7 @@ struct ImplicitGemmConvolutionGroupedProblemSizeHelper {
 
   CUTLASS_HOST_DEVICE
   static int32_t tile_count(const cutlass::gemm::GemmCoord& grid) {
-    return grid.m() * grid.n();
+    return grid.m() * grid.n() * grid.k();
   }
 };
 

@@ -130,8 +130,7 @@ struct BaseGroupedProblemVisitor {
   CUTLASS_HOST_DEVICE
   static cutlass::gemm::GemmCoord grid_shape(
     cutlass::conv::Operator conv_operator,
-    const cutlass::conv::Conv2dProblemSize& problem_size,
-    int split_k_slices=1) {
+    const cutlass::conv::Conv2dProblemSize& problem_size) {
 
     cutlass::gemm::GemmCoord implicit_gemm_problem_size = 
     cutlass::conv::implicit_gemm_problem_size(conv_operator, problem_size);
@@ -139,7 +138,7 @@ struct BaseGroupedProblemVisitor {
     return cutlass::gemm::GemmCoord(
       ((implicit_gemm_problem_size.m() - 1 + ThreadblockShape::kM) / ThreadblockShape::kM),
       ((implicit_gemm_problem_size.n() - 1 + ThreadblockShape::kN) / ThreadblockShape::kN),
-      1);
+      problem_size.split_k_slices);
   }
 
   // /// Get the grid shape
@@ -212,6 +211,33 @@ struct BaseGroupedProblemVisitor {
     }
 
     return total_tiles;
+  }
+
+  CUTLASS_HOST_DEVICE
+  int32_t prev_semaphore_count(int32_t problem_count) {
+    int32_t count = 0;
+    for (int32_t i = 0; i < problem_count; ++i) {
+      cutlass::conv::Conv2dProblemSize problem = params.problem_sizes[i];
+      cutlass::gemm::GemmCoord grid = grid_shape(cutlass::conv::Operator::kWgrad, problem);
+
+      count += grid.n() * grid.m();
+      
+    }
+    return count;
+  }
+
+  CUTLASS_HOST_DEVICE
+  static int32_t prev_semaphore_count(const cutlass::conv::Conv2dProblemSize* host_problem_sizes_ptr,
+                                     int32_t problem_count) {
+    int32_t count = 0;
+    for (int32_t i = 0; i < problem_count; ++i) {
+      auto problem = host_problem_sizes_ptr[i];
+      cutlass::gemm::GemmCoord grid = grid_shape(cutlass::conv::Operator::kWgrad, problem);
+ 
+      count += grid.n() * grid.m();
+ 
+    }
+    return count;
   }
 };
 
@@ -350,9 +376,18 @@ struct GroupedProblemVisitor<ProblemSizeHelper,
   }
 
   static size_t get_workspace_size(const cutlass::conv::Conv2dProblemSize* host_problem_sizes_ptr,
-                                   int32_t problem_count,
-                                   int32_t block_count) {
-    return 0;
+                                   int32_t problem_count) {
+    
+    size_t workspace_bytes = 0;
+
+    // if(params.split_k_mode == SplitKMode::kSerial{
+
+      // Split-K serial: The user workspace is used to store semaphore and serialize writing the 
+      // final reduced output to user's output tensor
+      workspace_bytes += sizeof(int) * Base::prev_semaphore_count(host_problem_sizes_ptr, problem_count);
+    // }
+
+    return workspace_bytes;
   }
 
   static void host_precompute(const cutlass::conv::Conv2dProblemSize* host_problem_sizes_ptr,

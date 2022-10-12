@@ -192,13 +192,8 @@ public:
 
   /// Gets the workspace size
   static size_t get_workspace_size(Arguments const &args) {
-    if (BaseKernel::ProblemVisitor::kRequiresPrecomputation) {
-      return BaseKernel::ProblemVisitor::get_workspace_size(args.host_problem_sizes,
-                                                            args.problem_count,
-                                                            args.threadblock_count);
-    } else {
-      return 0;
-    }
+    return BaseKernel::ProblemVisitor::get_workspace_size(args.host_problem_sizes,
+                                                          args.problem_count);
   }
 
   /// Computes the grid shape
